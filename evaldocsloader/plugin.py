@@ -81,7 +81,7 @@ class EvalDocsLoader(BasePlugin):
         out_filepath = os.path.join(out_dir, out_fileloc)
 
         # Fetch docs file from url
-        res = rq.get(url)
+        res = rq.get(url, headers={'command': 'docs'})
 
         if res.status_code == 200:
             with open(out_filepath, 'wb') as file:
