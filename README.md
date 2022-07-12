@@ -18,6 +18,17 @@ plugins:
 
 **`add_to_section`**: Path under which the fetched documentation files should be included. This can be arbirarily long. In this example, functions would appended to content under the "Authoring Content" section in the "Grading Functions" subsection.
 
+## Behaviour
+This plugin hooks into three events:
+
+**`on_config`**: After the config is loaded, a list of evaluation functions is fetched the endpoint specified in `gql_root_url`. Documentation files are fetched from each of the urls returned, and saved to a temporary directory. Successfully downloaded files are then registered to the `nav` config, under the section specified in `add_to_section`.
+
+**`on_files`**: Downloaded files are appended onto the end of the main `mkdocs.structure.files.Files` object
+
+**`on_post_build`**: The created temporary directory is cleaned up
+
+For all events, if a plugin-breaking error occurs, it will be caught and evaluation function documentation fetching is aborted.
+
 ## Dev Notes
 Package can be installed locally using 
 ```bash

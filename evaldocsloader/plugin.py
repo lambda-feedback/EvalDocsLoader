@@ -1,6 +1,5 @@
 from mkdocs.plugins import BasePlugin
 from mkdocs.config import config_options
-from mkdocs import utils
 from mkdocs.structure.files import File
 
 import requests as rq
@@ -173,5 +172,8 @@ class EvalDocsLoader(BasePlugin):
         return files
 
     def on_post_build(self, config):
-        logger.info("Cleaning up downloaded files")
-        self._dir.cleanup()
+        try:
+            logger.info("Cleaning up downloaded files")
+            self._dir.cleanup()
+        except AttributeError:
+            pass
