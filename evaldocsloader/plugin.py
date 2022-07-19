@@ -17,8 +17,9 @@ logger = logging.getLogger("mkdocs.plugin.evaldocsloader")
 
 
 class EvalDocsLoader(BasePlugin):
-    config_scheme = (('gql_root_url', config_options.Type(str)),
-                     ('add_to_section', config_options.Type(list)))
+    config_scheme = (('gql_root_url', config_options.Type(str, required=True)),
+                     ('add_to_section', config_options.Type(list,
+                                                            required=True)))
 
     def get_functions_list(self):
         """
