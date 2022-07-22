@@ -17,7 +17,9 @@ logger = logging.getLogger("mkdocs.plugin.evaldocsloader")
 
 
 class EvalDocsLoader(BasePlugin):
-    config_scheme = (('gql_root_url', config_options.Type(str, required=True)),
+    config_scheme = (('functions_announce_endpoint',
+                      config_options.Type(str, required=True)),
+                     (('api_key', config_options.Type(str, required=True))),
                      ('add_to_section', config_options.Type(list,
                                                             required=True)))
 
@@ -25,23 +27,22 @@ class EvalDocsLoader(BasePlugin):
         """
         Fetch list of evaluation functions, and their endpoints from a directory url
         """
-        root = self.config["gql_root_url"]
+        root = self.config["functions_announce_endpoint"]
         logger.info(f"Getting list of functions from {root}")
 
         try:
             # Fetch list of eval function endpoints from url
-            res = rq.get(root)
+            res = rq.get(root, headers={'api-key': self.config['api_key']})
             if res.status_code == 200:
                 data = res.json()
 
                 # Extract list from response
-                func_list = data.get("data",
-                                     {}).get("admin_evaluationFunctions",
-                                             {}).get("edges", "Error")
+                func_list = data.get("edges", "Error")
 
                 if func_list == "Error":
+
                     raise PluginError(
-                        "get_functions_list: list couldn't be parsed, check api response follows correct format"
+                        f"get_functions_list: {data.get('message', 'list could not be parsed, check api response follows correct format')}"
                     )
 
                 else:

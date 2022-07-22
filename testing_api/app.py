@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request
 import os
 
 app = Flask(__name__)
@@ -29,6 +29,53 @@ def testingfunctions():
                 5
             }
         }
+    }
+
+
+@app.route("/partial")
+def partial():
+    # Check headers
+    if request.headers.get('api-key') != "TESTING":
+        return {
+            "statusCode": 401,
+            "message": "Incorrect API key",
+            "error": "Unauthorized"
+        }
+
+    return {
+        "edges": [{
+            "name":
+            "isExactEqual",
+            "url":
+            "https://c1o0u8se7b.execute-api.eu-west-2.amazonaws.com/default/isExactEqual"
+        }, {
+            "name":
+            "arrayEqual",
+            "url":
+            "https://c1o0u8se7b.execute-api.eu-west-2.amazonaws.com/default/arrayEqual"
+        }, {
+            "name":
+            "wolframAlphaEqual",
+            "url":
+            "https://c1o0u8se7b.execute-api.eu-west-2.amazonaws.com/default/wolframAlphaEqual"
+        }, {
+            "name":
+            "symbolicEqual",
+            "url":
+            "https://c1o0u8se7b.execute-api.eu-west-2.amazonaws.com/default/symbolicEqual"
+        }, {
+            "name":
+            "arraySymbolicEqual",
+            "url":
+            "https://c1o0u8se7b.execute-api.eu-west-2.amazonaws.com/default/arraySymbolicEqual"
+        }, {
+            "name":
+            "isSimilar",
+            "url":
+            "https://c1o0u8se7b.execute-api.eu-west-2.amazonaws.com/default/isSimilar"
+        }],
+        "total":
+        6
     }
 
 

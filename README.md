@@ -10,18 +10,21 @@ Enable plugin in the `mkdocs.yml` file:
 ```yaml
 plugins:
   - evaldocsloader:
-     gql_root_url: "http://127.0.0.1:5050/testingfunctions"
+     functions_announce_endpoint: "http://127.0.0.1:5050/testingfunctions"
+     api_key: !ENV XXX
      add_to_section: ["Authoring Content", "Evaluation Functions"]
 ```
 
-**`gql_root_url`**: GraphQL Endpoint from which a list of evaluation functions be fetched
+**`functions_announce_endpoint`**: Endpoint from which a list of evaluation functions be fetched
+
+**`api_key`** Key to be passed onto the headers of the request ade to the functions announcing endpoint, used to authenticate the request.
 
 **`add_to_section`**: Path under which the fetched documentation files should be included. This can be arbirarily long. In this example, functions would appended to content under the "Authoring Content" section in the "Grading Functions" subsection.
 
 ## Behaviour
 This plugin hooks into three events:
 
-**`on_config`**: After the config is loaded, a list of evaluation functions is fetched the endpoint specified in `gql_root_url`. Documentation files are fetched from each of the urls returned, and saved to a temporary directory. Successfully downloaded files are then registered to the `nav` config, under the section specified in `add_to_section`.
+**`on_config`**: After the config is loaded, a list of evaluation functions is fetched the endpoint specified in `functions_announce_endpoint`. Documentation files are fetched from each of the urls returned, and saved to a temporary directory. Successfully downloaded files are then registered to the `nav` config, under the section specified in `add_to_section`.
 
 **`on_files`**: Downloaded files are appended onto the end of the main `mkdocs.structure.files.Files` object
 
