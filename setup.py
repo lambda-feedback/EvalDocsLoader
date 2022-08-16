@@ -9,7 +9,7 @@ def read(fname):
 setup(
     name='evaldocsloader',
     packages=find_packages(include=['evaldocsloader']),
-    version='0.1.3',
+    version='0.1.4',
     description=
     'Mkdocs plugin for fetching additional .md files based on a fetched list, specifically designed to work with the LambdaFeedback architecture.',
     author='Pierre Tharreau',

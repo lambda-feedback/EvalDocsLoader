@@ -73,6 +73,7 @@ class EvalDocsLoader(BasePlugin):
         """
         url = f.get('url', False)
         name = f.get('name', False)
+        supported_res_areas = f.get('supportedResponseTypes', [])
         logger.info(f"\tFetching user docs for {name}")
 
         # Files are saved to markdown
@@ -83,7 +84,13 @@ class EvalDocsLoader(BasePlugin):
         res = rq.get(url, headers={'command': 'docs-user'})
 
         if res.status_code == 200:
+            resarea_string = '!!! info "Supported Response Area Types"\n'
+            resarea_string += "    This evaluation function is supported by the following Response Area components:\n\n"
+            for t in supported_res_areas:
+                resarea_string += f"     - `{t}`\n"
+
             with open(out_filepath, 'wb') as file:
+                file.write(bytes(resarea_string, 'utf-8'))
                 file.write(res.content)
 
             # Create and append a few file object
