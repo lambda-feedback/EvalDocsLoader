@@ -103,7 +103,7 @@ class EvalDocsLoader(BasePlugin):
 
         else:
             logger.error(
-                f"Function {name} docs-user: {root} status code {res.status_code}"
+                f"Function {name} status code {res.status_code}"
             )
 
     def add_function_dev_docs(self, f):
@@ -146,7 +146,7 @@ class EvalDocsLoader(BasePlugin):
 
         else:
             logger.error(
-                f"Function {name} docs-dev: {root} status code {res.status_code}"
+                f"Function {name} status code {res.status_code}"
             )
 
     def update_nav(self, nav, loc, files):
@@ -155,6 +155,8 @@ class EvalDocsLoader(BasePlugin):
         the `nav` object based on the `loc` parameter
         """
         # Exit contition (we've reached the bottom of the location)
+        logger.info("update_nav called, location:")
+        logger.info(loc)
         if len(loc) == 0:
             # Append to the nav location
             if not isinstance(nav, list):
@@ -162,20 +164,23 @@ class EvalDocsLoader(BasePlugin):
 
             for k, v in files.items():
                 nav.append({k: v.src_path})
-
+            logger.info("returning TRUE")
             self.changed_nav = True
             return nav
 
         if isinstance(nav, dict):
+            logger.info("isinstance")
             return {
                 k: v if k != loc[0] else self.update_nav(v, loc[1:], files)
                 for k, v in nav.items()
             }
 
         elif isinstance(nav, list):
+            logger.info("isinstance2")
             return [self.update_nav(item, loc, files) for item in nav]
 
         else:
+            logger.info("returning nav")
             return nav
 
     def on_config(self, config):
