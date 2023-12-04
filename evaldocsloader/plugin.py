@@ -59,7 +59,7 @@ class EvalDocsLoader(BasePlugin):
 
             else:
                 raise PluginError(
-                    f"get_functions_list: {root} status code {res.status_code}"
+                    f"get_functions_list: status code {res.status_code}"
                 )
 
         except Exception as e:
