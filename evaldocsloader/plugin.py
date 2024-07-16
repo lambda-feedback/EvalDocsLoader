@@ -7,51 +7,55 @@ from mkdocs.structure.files import File, Files
 from mkdocs.exceptions import PluginError
 
 
-from .loader import DocsLoader
+from .loader_base import DocsLoader, DocsFile
 from .config import EvalDocsLoaderConfig
-from .loader_function import FunctionLoader
+from .loader import FunctionLoader
 
-logger = logging.getLogger(f"mkdocs.plugin.{__name__}")
-
-def create_loader(config: EvalDocsLoaderConfig):
-    if config.source == 'function':
-        return FunctionLoader(config.function)
-    elif config.source == 'repository':
-        return RepoLoader(config.repository)
-    else:
-        raise ValueError(f"Invalid source: {config.source}")
+logger = logging.getLogger("mkdocs.plugin.evaldocsloader")
 
 class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
 
     _loader: DocsLoader
+    _files: List[File] = []
 
     def on_config(self, config: MkDocsConfig) -> MkDocsConfig | None:
         # after parsing the config, create the loader
-        self._loader = create_loader(self.config)
+        self._loader = FunctionLoader(self.config)
 
-        return config
-
-    def on_files(self, files: Files, /, *, config: MkDocsConfig) -> Files | None:
+        # load the documentation files
         bundles = self._loader.load()
 
-        results: Dict[str, Dict[str, File]] = {
+        results: Dict[str, Dict[str, str]] = {
             "dev": {},
             "user": {}
         }
+
+        files = []
 
         for bundle in bundles:
             # add the downloaded files to the list of output files
             # and store them in the results dictionary
             if bundle.dev:
-                files.append(bundle.dev)
-                results["dev"][bundle.name] = bundle.dev
+                file = _create_mkdocs_file(bundle.dev, config)
+                files.append(file)
+                results["dev"][bundle.name] = file.src_path
             
             if bundle.user:
-                files.append(bundle.user)
-                results["user"][bundle.name] = bundle.user
+                file = _create_mkdocs_file(bundle.user, config)
+                files.append(file)
+                results["user"][bundle.name] = file.src_path
 
         # update the nav with the new files
         config.nav = self.update_nav(config.nav, results)
+
+        # store the files for later use
+        self._files = files
+
+        return config
+
+    def on_files(self, files: Files, /, *, config: MkDocsConfig) -> Files | None:
+        for file in self._files:
+            files.append(file)
 
         return files
 
@@ -59,7 +63,7 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
         # cleanup the loader after the build
         self.loader.cleanup()
 
-    def update_nav(self, nav: Any, results: Dict[str, Dict[str, File]]) -> None:
+    def update_nav(self, nav: Any, results: Dict[str, Dict[str, str]]) -> None:
         nav, changed_dev = update_nav_section(nav, self.config.dev_section, results["dev"])
         if not changed_dev:
             raise PluginError("Nav dev_section path not updated")
@@ -70,7 +74,7 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
 
         return nav
 
-def update_nav_section(nav: Any, loc: List[str], files: Dict[str, File]) -> Tuple[Any, bool]:
+def update_nav_section(nav: Any, loc: List[str], files: Dict[str, str]) -> Tuple[Any, bool]:
     """
     Recursive method appends downloaded documentation pages in `file` to
     the `nav` object based on the `loc` parameter
@@ -82,14 +86,14 @@ def update_nav_section(nav: Any, loc: List[str], files: Dict[str, File]) -> Tupl
             nav = [nav]
 
         for k, v in files.items():
-            nav.append({k: v.src_path})
+            nav.append({k: v})
 
         return nav, True
 
     if isinstance(nav, dict):
         # build a new dict with the (potentially) updated children
         processed_nav = {
-            k: update_nav(v, loc[1:], files) if k == loc[0] else (v, False)
+            k: update_nav_section(v, loc[1:], files) if k == loc[0] else (v, False)
             for k, v in nav.items()
         }
         
@@ -101,7 +105,7 @@ def update_nav_section(nav: Any, loc: List[str], files: Dict[str, File]) -> Tupl
 
     elif isinstance(nav, list):
         # build a new list with the (potentially) updated children
-        processed_nav = [update_nav(item, loc, files) for item in nav]
+        processed_nav = [update_nav_section(item, loc, files) for item in nav]
 
         # check if any of the children have changed
         changed = any(changed for (_, changed) in processed_nav)
@@ -112,3 +116,11 @@ def update_nav_section(nav: Any, loc: List[str], files: Dict[str, File]) -> Tupl
     else:
         # return the nav object as-is and that it hasn't changed
         return nav, False
+    
+def _create_mkdocs_file(file: DocsFile, config: MkDocsConfig) -> File:
+    return File(
+        path=file.path,
+        src_dir=file.dir,
+        dest_dir=config.site_dir,
+        use_directory_urls=config.use_directory_urls,
+    )
