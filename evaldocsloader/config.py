@@ -4,14 +4,14 @@ from mkdocs.config import Config, config_options as opt
 
 class EvalDocsLoaderConfig(Config):
     # Function metadata options
-    function_announce_endpoint = opt.Type(str, required=True)
-    api_key = opt.Type(str, required=True)
+    functions_announce_endpoint = opt.Type(str)
+    api_key = opt.Type(str)
 
     # GitHub options
-    github_owner = opt.Type(str, required=True, default="lambda_feedback")
-    github_topic = opt.Type(str, required=True, default="evaluation_function")
-    github_token = opt.Type(str, required=True, default=environ.get("GITHUB_TOKEN"))
+    github_owner = opt.Type(str, default="lambda-feedback")
+    github_topic = opt.Type(str, default="evaluation-function")
+    github_token = opt.Type(str, default=environ.get("GITHUB_TOKEN"))
 
     # Section names
-    dev_section = opt.ListOfItems(opt.Type(str), required=True)
-    user_section = opt.ListOfItems(opt.Type(str), required=True)
+    dev_section = opt.ListOfItems(opt.Type(str))
+    user_section = opt.ListOfItems(opt.Type(str))

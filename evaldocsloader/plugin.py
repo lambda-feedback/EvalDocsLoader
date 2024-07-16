@@ -19,39 +19,42 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
     _files: List[File] = []
 
     def on_config(self, config: MkDocsConfig) -> MkDocsConfig | None:
-        # after parsing the config, create the loader
-        self._loader = FunctionLoader(self.config)
+        try:
+            # after parsing the config, create the loader
+            self._loader = FunctionLoader(self.config)
 
-        # load the documentation files
-        bundles = self._loader.load()
+            # load the documentation files
+            bundles = self._loader.load()
 
-        results: Dict[str, Dict[str, str]] = {
-            "dev": {},
-            "user": {}
-        }
+            results: Dict[str, Dict[str, str]] = {
+                "dev": {},
+                "user": {}
+            }
 
-        files = []
+            files = []
 
-        for bundle in bundles:
-            # add the downloaded files to the list of output files
-            # and store them in the results dictionary
-            if bundle.dev:
-                file = _create_mkdocs_file(bundle.dev, config)
-                files.append(file)
-                results["dev"][bundle.name] = file.src_path
-            
-            if bundle.user:
-                file = _create_mkdocs_file(bundle.user, config)
-                files.append(file)
-                results["user"][bundle.name] = file.src_path
+            for bundle in bundles:
+                # add the downloaded files to the list of output files
+                # and store them in the results dictionary
+                if bundle.dev:
+                    file = _create_mkdocs_file(bundle.dev, config)
+                    files.append(file)
+                    results["dev"][bundle.name] = file.src_path
+                
+                if bundle.user:
+                    file = _create_mkdocs_file(bundle.user, config)
+                    files.append(file)
+                    results["user"][bundle.name] = file.src_path
 
-        # update the nav with the new files
-        config.nav = self.update_nav(config.nav, results)
+            # update the nav with the new files
+            config.nav = self.update_nav(config.nav, results)
 
-        # store the files for later use
-        self._files = files
+            # store the files for later use
+            self._files = files
 
-        return config
+            return config
+        except Exception as e:
+            raise PluginError(f"Error loading evaluation function documentation: {e}")
 
     def on_files(self, files: Files, /, *, config: MkDocsConfig) -> Files | None:
         for file in self._files:
@@ -59,9 +62,9 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
 
         return files
 
-    def on_post_build(self, *, _: MkDocsConfig) -> None:
+    def on_post_build(self, *, config: MkDocsConfig) -> None:
         # cleanup the loader after the build
-        self.loader.cleanup()
+        self._loader.cleanup()
 
     def update_nav(self, nav: Any, results: Dict[str, Dict[str, str]]) -> None:
         nav, changed_dev = update_nav_section(nav, self.config.dev_section, results["dev"])
