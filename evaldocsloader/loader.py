@@ -21,11 +21,6 @@ class FunctionConfig:
     name: str
     docs_dir: Optional[str]
 
-@dataclass
-class _GatherFunctionResult:
-    repos: List[Repository]
-    meta: Dict[str, Dict]
-
 class FunctionLoader(DocsLoader):
 
     _config: EvalDocsLoaderConfig
@@ -66,7 +61,9 @@ class FunctionLoader(DocsLoader):
             # create a temporary directory to store the documentation
             self._dir = tempfile.TemporaryDirectory(prefix='mkdocs_eval_docs_')
 
-            os.mkdir(os.path.join(self._dir.name, "deployed_functions"))
+            # create the directories for the documentation
+            for category in ["user", "dev"]:
+                os.mkdir(os.path.join(self._dir.name, f"{category}_eval_function_docs"))
 
             bundles = []
 
@@ -130,35 +127,18 @@ class FunctionLoader(DocsLoader):
 
         meta = meta_map.get(config.name, {})
 
-        base_path = os.path.join("deployed_functions", config.name)
+        result = {}
 
-        out_dir = self._dir.name
-
-        # create base dir for the function docs
-        os.mkdir(os.path.join(out_dir, base_path))
-
-        user = None
-        user_out_path = os.path.join(base_path, "user.md")
-        user_out_file = os.path.join(out_dir, user_out_path)
-        try:
-            self._fetch_user_docs(repo, meta, config.docs_dir, user_out_file)
-            user = DocsFile(path=user_out_path, dir=out_dir)
-        except Exception as e:
-            logger.warning(f"Failed to fetch 'user' docs for '{repo.name}': {e}")
-
-        dev = None
-        dev_out_path = os.path.join(base_path, "dev.md")
-        dev_out_file = os.path.join(out_dir, dev_out_path)
-        try:
-            self._fetch_dev_docs(repo, meta, config.docs_dir, dev_out_file)
-            dev = DocsFile(path=dev_out_path, dir=out_dir)
-        except Exception as e:
-            logger.warning(f"Failed to fetch 'dev' docs for '{repo.name}': {e}")
+        for category in ["user", "dev"]:
+            try:
+                result[category] = self._fetch_docs(category, repo, meta, config)
+            except Exception as e:
+                logger.warning(f"Failed to fetch '{category}' docs for '{repo.name}': {e}")
 
         return DocsBundle(
             name=config.name,
-            user=user,
-            dev=dev,
+            user=result.get("user"),
+            dev=result.get("dev"),
         )
 
     def _get_function_config(self, repo: Repository) -> FunctionConfig:
@@ -177,34 +157,51 @@ class FunctionLoader(DocsLoader):
         except Exception as e:
             raise ValueError(f"Failed to get function config for {repo.name}", e)
 
-    def _fetch_user_docs(
+    def _fetch_docs(
         self,
+        category: str,
         repo: Repository,
         meta: Dict[str, Any],
-        remote_dir: Optional[str],
+        config: FunctionConfig,
+    ) -> DocsFile:
+        out_dir = self._dir.name
+
+        # the out path is the path used to build the url
+        out_path = os.path.join(f"{category}_eval_function_docs", f"{config.name}.md")
+
+        docs = fetch_docs_file(repo, config.docs_dir, f"{category}.md")
+
+        write_fn = getattr(self, f"_write_{category}_docs")
+        if not write_fn:
+            raise ValueError(f"Invalid category '{category}'")
+
+        out_file = os.path.join(out_dir, out_path)
+        write_fn(docs, meta, out_file)
+
+        return DocsFile(path=out_path, dir=out_dir)
+
+    def _write_user_docs(
+        self,
+        docs: ContentFile,
+        meta: Dict[str, Any],
         out_file: str,
     ) -> None:
-        userDocs = self._fetch_docs(repo, remote_dir, "user.md")
-
         supported_response_types = meta.get("supportedResponseTypes", [])
         response_areas_str = format_response_areas(supported_response_types)
 
         with open(out_file, "wb") as file:
             file.write(bytes(response_areas_str, "utf-8"))
             file.write(bytes("\n\n", "utf-8"))
-            file.write(userDocs.decoded_content)
+            file.write(docs.decoded_content)
         
-    def _fetch_dev_docs(
+    def _write_dev_docs(
         self,
-        repo: Repository,
+        docs: ContentFile,
         meta: Dict[str, Any],
-        remote_dir: Optional[str],
         out_file: str,
     ) -> None:
-        devDocs = self._fetch_docs(repo, remote_dir, "dev.md")
-
         with open(out_file, "wb") as file:
-            file.write(devDocs.decoded_content)
+            file.write(docs.decoded_content)
 
     def cleanup(self):
         try:
@@ -213,19 +210,6 @@ class FunctionLoader(DocsLoader):
         except AttributeError:
             pass
 
-    def _fetch_docs(self, repo: Repository, docs_dir: Optional[str], file: str) -> ContentFile:
-        if docs_dir:
-            # try to get the file from the specified directory
-            logger.debug(f"Trying to fetch {file} from {docs_dir}")
-            return repo.get_contents(f"{docs_dir}/{file}")
-
-        try:
-            # try to get the file from the default location
-            return self._fetch_docs(repo, "docs", file)
-        except Exception:
-            # if the default location does not exist, try the app/docs location
-            logger.warning(f"Could not find docs in default location for {repo.name}, trying app/docs")
-            return self._fetch_docs(repo, "app/docs", file)
 
 def format_response_areas(areas: List[str]) -> str:
     if not areas or len(areas) == 0:
@@ -238,3 +222,19 @@ def format_response_areas(areas: List[str]) -> str:
     for t in areas:
         out += f"     - `{t}`\n"
     return out
+
+
+def fetch_docs_file(repo: Repository, docs_dir: Optional[str], file: str) -> ContentFile:
+    if docs_dir:
+        # try to get the file from the specified directory
+        logger.debug(f"Trying to fetch {file} from {docs_dir}...")
+        return repo.get_contents(f"{docs_dir}/{file}")
+
+    try:
+        # try to get the file from the default location
+        logger.debug(f"Trying to fetch {file} from default location...")
+        return fetch_docs_file(repo, "docs", file)
+    except Exception:
+        # if the default location does not exist, try the app/docs location
+        logger.warning(f"Could not find docs in default location for {repo.name}, trying app/docs...")
+        return fetch_docs_file(repo, "app/docs", file)
