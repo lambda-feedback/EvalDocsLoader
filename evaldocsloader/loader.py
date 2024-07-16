@@ -1,9 +1,15 @@
+import mistletoe.block_token
+import mistletoe.core_tokens
+import mistletoe.markdown_renderer
+import mistletoe.span_token
+import mistletoe.token
 import requests as rq
 import os
 import tempfile
 import logging
 import ujson
 import concurrent.futures
+import mistletoe
 from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
 
@@ -178,7 +184,9 @@ class FunctionLoader(DocsLoader):
         out_file = os.path.join(out_dir, out_path)
         write_fn(docs, meta, out_file)
 
-        return DocsFile(path=out_path, dir=out_dir)
+        edit_uri = f"{repo.html_url}/edit/main/{docs.path}"
+
+        return DocsFile(path=out_path, dir=out_dir, edit_uri=edit_uri)
 
     def _write_user_docs(
         self,
@@ -187,13 +195,25 @@ class FunctionLoader(DocsLoader):
         out_file: str,
     ) -> None:
         supported_response_types = meta.get("supportedResponseTypes", [])
-        response_areas_str = format_response_areas(supported_response_types)
+        response_areas_content = format_response_areas(supported_response_types)
+
+        doc = mistletoe.Document(str(docs.decoded_content, "utf-8"))
+
+        # find the index of the first heading in the document
+        heading = -1
+        for i, token in enumerate(doc.children):
+            if isinstance(token, mistletoe.block_token.Heading) and token.level == 1:
+                heading = i
+                break
+
+        # insert the response areas string after the first root heading
+        doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([response_areas_content]))
 
         with open(out_file, "wb") as file:
-            file.write(bytes(response_areas_str, "utf-8"))
-            file.write(bytes("\n\n", "utf-8"))
-            file.write(docs.decoded_content)
-        
+            with mistletoe.markdown_renderer.MarkdownRenderer() as renderer:
+                out = renderer.render(doc)
+                file.write(bytes(out, "utf-8"))
+
     def _write_dev_docs(
         self,
         docs: ContentFile,
@@ -212,16 +232,19 @@ class FunctionLoader(DocsLoader):
 
 
 def format_response_areas(areas: List[str]) -> str:
-    if not areas or len(areas) == 0:
-        out = "!!! warning \"Supported Response Area Types\"\n"
-        out += "    This evaluation function is not configured for any Response Area components"
-        return out
+    out = []
 
-    out = "!!! info \"Supported Response Area Types\"\n"
-    out += "    This evaluation function is supported by the following Response Area components:\n\n"
-    for t in areas:
-        out += f"     - `{t}`\n"
-    return out
+    if not areas or len(areas) == 0:
+        out.append("!!! warning \"Supported Response Area Types\"")
+        out.append("    This evaluation function is not configured for any Response Area components")
+    else:
+        out.append("!!! info \"Supported Response Area Types\"")
+        out.append("    This evaluation function is supported by the following Response Area components:")
+        out.append("")
+        for t in areas:
+            out.append(f"      - `{t}`")
+
+    return "\n".join(out)
 
 
 def fetch_docs_file(repo: Repository, docs_dir: Optional[str], file: str) -> ContentFile:

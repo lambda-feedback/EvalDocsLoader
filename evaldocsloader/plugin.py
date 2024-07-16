@@ -121,9 +121,17 @@ def update_nav_section(nav: Any, loc: List[str], files: Dict[str, str]) -> Tuple
         return nav, False
     
 def _create_mkdocs_file(file: DocsFile, config: MkDocsConfig) -> File:
-    return File(
+    f = File(
         path=file.path,
         src_dir=file.dir,
         dest_dir=config.site_dir,
         use_directory_urls=config.use_directory_urls,
     )
+
+    # disable edit_uri for downloaded pages since mkdocs doesn't
+    # support absolute URIs for edit links
+    f.edit_uri = None
+
+    # if file.edit_uri:
+    #     f.edit_uri = file.edit_uri
+    return f

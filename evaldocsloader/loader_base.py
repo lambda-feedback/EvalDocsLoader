@@ -14,6 +14,9 @@ class DocsFile:
     dir: str
     """The directory containing the file"""
 
+    edit_uri: Optional[str]
+    """The URI to edit the file"""
+
 @dataclass
 class DocsBundle:
     """

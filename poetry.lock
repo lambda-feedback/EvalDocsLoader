@@ -659,6 +659,17 @@ files = [
 ]
 
 [[package]]
+name = "mistletoe"
+version = "1.4.0"
+description = "A fast, extensible Markdown parser in pure Python."
+optional = false
+python-versions = "~=3.5"
+files = [
+    {file = "mistletoe-1.4.0-py3-none-any.whl", hash = "sha256:44a477803861de1237ba22e375c6b617690a31d2902b47279d1f8f7ed498a794"},
+    {file = "mistletoe-1.4.0.tar.gz", hash = "sha256:1630f906e5e4bbe66fdeb4d29d277e2ea515d642bb18a9b49b136361a9818c9d"},
+]
+
+[[package]]
 name = "mkdocs"
 version = "1.6.0"
 description = "Project documentation with Markdown."
@@ -1398,4 +1409,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "c7dc8973395d77137710abbb3c1bb045bde688e39a12d8c547832f87b7d920d8"
+content-hash = "da4c14380db533ade4c42260c52b9718101508a444e9a22a0cb04e8cb0d96cc6"
