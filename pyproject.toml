@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "evaldocsloader"
+version = "0.2.0"
+description = "Mkdocs plugin for fetching, building and consolidating evaluation function documentation."
+authors = [
+    "Andreas Pfurtscheller <andreas.pfurtscheller23@imperial.ac.uk>",
+    "Pierre Tharreau <pierre.tharreau18@imperial.ac.uk>",
+]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "evaldocsloader" }]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+PyGithub = "^2.3.0"
+ujson = "^5.10.0"
+aiohttp = "^3.9.5"
+mistletoe = "^1.4.0"
+
+[tool.poetry.dev-dependencies]
+mkdocs = "^1.6.0"
+
+[tool.poetry.plugins."mkdocs.plugins"]
+evaldocsloader = "evaldocsloader.plugin:EvalDocsLoader"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
