@@ -15,7 +15,7 @@ logger = logging.getLogger("mkdocs.plugin.evaldocsloader")
 
 class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
 
-    _loader: DocsLoader
+    _loader: DocsLoader = None
     _files: List[File] = []
 
     def on_config(self, config: MkDocsConfig) -> MkDocsConfig | None:
@@ -40,14 +40,15 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
                 _build_results("user", doc, config, files, results)
 
             # update the nav with the new files
-            config.nav = self.update_nav(config.nav, results)
+            config.nav = self._update_nav(config.nav, results)
 
             # store the files for later use
             self._files = files
 
             return config
         except Exception as e:
-            raise PluginError(f"Error loading evaluation function documentation: {e}")
+            logger.error(f"Error loading Evaluation Function documentation: {e}")
+            logger.error("Disabling EvalDocsLoader plugin")
 
     def on_files(self, files: Files, /, *, config: MkDocsConfig) -> Files | None:
         for file in self._files:
@@ -56,10 +57,11 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
         return files
 
     def on_post_build(self, *, config: MkDocsConfig) -> None:
-        # cleanup the loader after the build
-        self._loader.cleanup()
+        if self._loader:
+            # cleanup the loader after the build
+            self._loader.cleanup()
 
-    def update_nav(self, nav: Any, results: Dict[str, Dict[str, str]]) -> None:
+    def _update_nav(self, nav: Any, results: Dict[str, Dict[str, str]]) -> None:
         nav, changed_dev = update_nav_section(nav, self.config.dev_section, results["dev"])
         if not changed_dev:
             raise PluginError("Nav dev_section path not updated")
