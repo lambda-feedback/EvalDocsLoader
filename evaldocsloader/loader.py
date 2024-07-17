@@ -21,25 +21,30 @@ class FunctionLoader(DocsLoader):
     _config: EvalDocsLoaderConfig
     _dir: tempfile.TemporaryDirectory
     _github: Github
+    _max_workers: int
 
     def __init__(self, config: EvalDocsLoaderConfig) -> None:
         if not config.functions_announce_endpoint:
             raise ValueError("Functions announce endpoint not set")
         
         if not config.api_key or config.api_key == "disabled":
-            raise ValueError("API key disabled, switching plugin off")
+            raise ValueError("API key not set")
         
         if not config.github_token:
-            raise ValueError("Github token not set")
+            raise ValueError("GitHub token not set")
         
         if not config.github_owner:
-            raise ValueError("Github owner not set")
+            raise ValueError("GitHub owner not set")
         
         if not config.github_topic:
-            raise ValueError("Github repository topic not set")
+            raise ValueError("GitHub repository topic not set")
+        
+        if not config.max_workers >= 0:
+            raise ValueError("Max workers must be greater than or equal to 0")
 
         self._config = config
-        self._github = Github(auth=Auth.Token(config.github_token))
+        self._max_workers = min(32, config.max_workers if config.max_workers > 0 else (os.cpu_count() or 1) + 4)
+        self._github = Github(auth=Auth.Token(config.github_token), pool_size=self._max_workers)
 
     def load(self) -> List[Docs]:
         logger.info("Fetching Evaluation Function documentation...")
@@ -61,7 +66,7 @@ class FunctionLoader(DocsLoader):
             docs = []
 
             # fetch the documentation for each function
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as pool:
                 for doc in pool.map(lambda r: self._fetch_function_docs(r, meta), repos):
                     docs.append(doc)
 
