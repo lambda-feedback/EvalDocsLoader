@@ -5,31 +5,16 @@ import tempfile
 import logging
 import ujson
 import concurrent.futures
-from typing import Dict, Optional, List, Any
-from dataclasses import dataclass
-from urllib.parse import urljoin
-
-import mistletoe
-import mistletoe.span_token
-import mistletoe.token
-import mistletoe.block_token
-import mistletoe.core_tokens
-from mistletoe.markdown_renderer import MarkdownRenderer
-from mistletoe.base_renderer import BaseRenderer
+from typing import List, Dict
 
 from github import Github, Auth
 from github.Repository import Repository
-from github.ContentFile import ContentFile
 
-from .loader_base import DocsLoader, DocsFile, Docs, DocsBundle
+from .loader_base import DocsLoader, Docs, FunctionConfig
 from .config import EvalDocsLoaderConfig
+from .loader_fetch import FetchDocsJob
 
 logger = logging.getLogger("mkdocs.plugin.evaldocsloader.loader")
-
-@dataclass
-class FunctionConfig:
-    name: str
-    docs_dir: Optional[str]
 
 class FunctionLoader(DocsLoader):
 
@@ -139,7 +124,8 @@ class FunctionLoader(DocsLoader):
 
         for category in ["user", "dev"]:
             try:
-                result[category] = self._fetch_docs(category, repo, meta, config)
+                job = FetchDocsJob(category, repo, meta, config, self._dir.name)
+                result[category] = job.fetch()
             except Exception as e:
                 logger.warning(f"Failed to fetch '{category}' docs for '{repo.name}': {e}")
 
@@ -165,181 +151,9 @@ class FunctionLoader(DocsLoader):
         except Exception as e:
             raise ValueError(f"Failed to get function config for {repo.name}", e)
 
-    def _fetch_docs(
-        self,
-        category: str,
-        repo: Repository,
-        meta: Dict[str, Any],
-        config: FunctionConfig,
-    ) -> DocsBundle:
-        out_dir = self._dir.name
-
-        base_dir = f"{category}_eval_function_docs"
-
-        # the out path is the path used to build the url
-        out_path = os.path.join(base_dir, f"{config.name}.md")
-
-        # fetch the documentation file
-        file = fetch_docs_file(repo, config.docs_dir, f"{category}.md")
-
-        # determine the actual directory of the file
-        actual_docs_path = os.path.dirname(file.path)
-
-        # parse the markdown document
-        doc = mistletoe.Document(str(file.decoded_content, "utf-8"))
-
-        link_out_dir = os.path.join(out_dir, base_dir)
-        link_loader = _MarkdownLinkLoader(
-            repo=repo,
-            name=config.name,
-            docs_path=actual_docs_path,
-            out_dir=link_out_dir
-        )
-        doc = link_loader.render(doc)
-
-        edit_fn = getattr(self, f"_edit_{category}_docs", None)
-        if edit_fn:
-            doc = edit_fn(doc, meta)
-        else:
-            logger.debug(f"No edit function found for {category}")
-
-        # write the rendered markdown to the output file
-        out_file_name = os.path.join(out_dir, out_path)
-        with open(out_file_name, "wb") as fw:
-            with MarkdownRenderer() as renderer:
-                out = renderer.render(doc)
-                fw.write(bytes(out, "utf-8"))
-
-        edit_uri = f"{repo.html_url}/edit/main/{file.path}"
-
-        return DocsBundle(
-            main=DocsFile(path=out_path, dir=out_dir, edit_uri=edit_uri),
-            supplementary=[
-                DocsFile(path=os.path.join(base_dir, f), dir=out_dir)
-                for f in link_loader.files
-            ],
-        )
-
-    def _edit_user_docs(
-        self,
-        doc: mistletoe.Document,
-        meta: Dict[str, Any],
-    ) -> mistletoe.Document:
-
-        # find the index of the first heading in the document
-        heading = -1
-        for i, token in enumerate(doc.children):
-            if isinstance(token, mistletoe.block_token.Heading) and token.level == 1:
-                heading = i
-                break
-
-        # insert the response areas string after the first root heading
-        supported_response_types = meta.get("supportedResponseTypes", [])
-        response_areas_content = format_response_areas(supported_response_types)
-        doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([response_areas_content]))
-
-        return doc
-
     def cleanup(self):
         try:
             logger.info("Cleaning up downloaded files")
             self._dir.cleanup()
         except AttributeError:
             pass
-
-
-def format_response_areas(areas: List[str]) -> str:
-    out = []
-
-    if not areas or len(areas) == 0:
-        out.append("!!! warning \"Supported Response Area Types\"")
-        out.append("    This evaluation function is not configured for any Response Area components")
-    else:
-        out.append("!!! info \"Supported Response Area Types\"")
-        out.append("    This evaluation function is supported by the following Response Area components:")
-        out.append("")
-        for t in areas:
-            out.append(f"      - `{t}`")
-
-    return "\n".join(out)
-
-
-def fetch_docs_file(repo: Repository, docs_path: Optional[str], file: str) -> ContentFile:
-    if docs_path:
-        # try to get the file from the specified directory
-        docs_path = docs_path.strip("/")
-        docs_path = f"{docs_path}/"
-        path = urljoin(docs_path, file)
-        logger.debug(f"Trying to fetch {path}...")
-        return repo.get_contents(path)
-
-    try:
-        # try to get the file from the default location
-        logger.debug(f"Trying to fetch {file} from default location...")
-        return fetch_docs_file(repo, "docs", file)
-    except Exception:
-        # if the default location does not exist, try the app/docs location
-        logger.warning(f"Could not find docs in default location for {repo.name}, trying app/docs...")
-        return fetch_docs_file(repo, "app/docs", file)
-
-
-class _MarkdownLinkLoader(BaseRenderer):
-    _repo: Repository
-    _name: str
-    _docs_path: str
-    _out_dir: str
-    _files: List[str]
-
-    def __init__(self, repo: Repository, name: str, docs_path: str, out_dir: str) -> None:
-        self._repo = repo
-        self._name = name
-        self._docs_path = docs_path
-        self._out_dir = out_dir
-        self._files = []
-        super().__init__()
-    
-    def render_inner(self, token: mistletoe.token.Token) -> mistletoe.token.Token:
-        if token.children:
-            for child in token.children:
-                self.render(child)
-        return token
-    
-    @property
-    def files(self) -> List[str]:
-        return self._files
-
-    def render_image(self, token: mistletoe.span_token.Image) -> mistletoe.span_token.Image:
-        token.src = self._fetch(token.src)
-        return super().render_image(token)
-    
-    def render_auto_link(self, token: mistletoe.span_token.AutoLink) -> mistletoe.span_token.AutoLink:
-        token.target = self._fetch(token.target)
-        return super().render_auto_link(token)
-    
-    def render_link(self, token: mistletoe.span_token.Link) -> mistletoe.span_token.Link:
-        token.target = self._fetch(token.target)
-        return super().render_link(token)
-    
-    def _fetch(self, link_url: str) -> None:
-        # only fetch relative links
-        if link_url.startswith("http"):
-            return link_url
-
-        try:
-            # fetch the markdown file
-            file = fetch_docs_file(self._repo, self._docs_path, link_url)
-
-            out_file_name = link_url.replace("/", "_")
-            out_file_name = f"{self._name}_{out_file_name}"
-
-            out_file_path = os.path.join(self._out_dir, out_file_name)
-
-            with open(out_file_path, "wb") as f:
-                f.write(file.decoded_content)
-
-            self._files.append(out_file_name)
-
-            return out_file_name
-        except Exception as e:
-            logger.warning(f"Failed to fetch supplementary content for {self._name} - {link_url}: {e}")
-            return link_url

@@ -115,7 +115,7 @@ def update_nav_section(nav: Any, loc: List[str], files: Dict[str, str]) -> Tuple
     
 def _create_mkdocs_file(file: DocsFile, config: MkDocsConfig) -> File:
     f = File(
-        path=file.path,
+        path=file.file_path,
         src_dir=file.dir,
         dest_dir=config.site_dir,
         use_directory_urls=config.use_directory_urls,

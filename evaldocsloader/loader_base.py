@@ -3,12 +3,17 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 @dataclass
+class FunctionConfig:
+    name: str
+    docs_dir: Optional[str]
+
+@dataclass
 class DocsFile:
     """
     A documentation file
     """
 
-    path: str
+    file_path: str
     """The path to the file"""
 
     dir: str
