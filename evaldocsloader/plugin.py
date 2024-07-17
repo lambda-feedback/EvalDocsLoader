@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple, Any, List, Dict
+from typing import Tuple, Any, List, Dict, Optional
 
 from mkdocs.config.defaults import MkDocsConfig
 from mkdocs.plugins import BasePlugin
@@ -7,7 +7,7 @@ from mkdocs.structure.files import File, Files
 from mkdocs.exceptions import PluginError
 
 
-from .loader_base import DocsLoader, DocsFile
+from .loader_base import DocsLoader, DocsFile, Docs, DocsBundle
 from .config import EvalDocsLoaderConfig
 from .loader import FunctionLoader
 
@@ -24,7 +24,7 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
             self._loader = FunctionLoader(self.config)
 
             # load the documentation files
-            bundles = self._loader.load()
+            docs = self._loader.load()
 
             results: Dict[str, Dict[str, str]] = {
                 "dev": {},
@@ -33,18 +33,11 @@ class EvalDocsLoader(BasePlugin[EvalDocsLoaderConfig]):
 
             files = []
 
-            for bundle in bundles:
+            for doc in docs:
                 # add the downloaded files to the list of output files
                 # and store them in the results dictionary
-                if bundle.dev:
-                    file = _create_mkdocs_file(bundle.dev, config)
-                    files.append(file)
-                    results["dev"][bundle.name] = file.src_path
-                
-                if bundle.user:
-                    file = _create_mkdocs_file(bundle.user, config)
-                    files.append(file)
-                    results["user"][bundle.name] = file.src_path
+                _build_results("dev", doc, config, files, results)
+                _build_results("user", doc, config, files, results)
 
             # update the nav with the new files
             config.nav = self.update_nav(config.nav, results)
@@ -134,4 +127,20 @@ def _create_mkdocs_file(file: DocsFile, config: MkDocsConfig) -> File:
 
     # if file.edit_uri:
     #     f.edit_uri = file.edit_uri
+    return f
+
+def _build_results(category: str, docs: Docs, config: MkDocsConfig, files: List[File], results: Dict[str, Dict[str, str]]) -> None:
+    bundle: Optional[DocsBundle] = getattr(docs, category, None)
+    if not bundle:
+        return
+
+    file = _build_file(bundle.main, config, files)
+    results[category][docs.name] = file.src_path
+
+    for supplementary in bundle.supplementary:
+        _build_file(supplementary, config, files)
+
+def _build_file(file: DocsFile, config: MkDocsConfig, files: List[File]) -> File:
+    f = _create_mkdocs_file(file, config)
+    files.append(f)
     return f
