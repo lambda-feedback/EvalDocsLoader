@@ -123,12 +123,14 @@ def _create_mkdocs_file(file: DocsFile, config: MkDocsConfig) -> File:
         use_directory_urls=config.use_directory_urls,
     )
 
-    # disable edit_uri for downloaded pages since mkdocs doesn't
-    # support absolute URIs for edit links
+    # disable edit_uri for downloaded pages since mkdocs
+    # doesn't support absolute URIs for edit links
+    # see https://github.com/mkdocs/mkdocs/issues/3775
     f.edit_uri = None
 
     # if file.edit_uri:
     #     f.edit_uri = file.edit_uri
+
     return f
 
 def _build_results(category: str, docs: Docs, config: MkDocsConfig, files: List[File], results: Dict[str, Dict[str, str]]) -> None:
