@@ -62,7 +62,10 @@ class FetchDocsJob:
             main=results[0],
             supplementary=results[1:] if len(results) > 1 else [],
         )
-    
+
+    def _edit_uri(self, file: ContentFile):
+        return f"{self._repo.html_url}/edit/{self._repo.default_branch}/{file.path}"
+
     def _fetch_and_process_file(
         self,
         remote_file_path: str,
@@ -103,7 +106,7 @@ class FetchDocsJob:
             DocsFile(
                 dir=self._out_dir,
                 file_path=out_file_path,
-                edit_uri=f"{self._repo.html_url}/edit/main/{file.path}",
+                edit_uri=self._edit_uri(file),
             )
         )
 
@@ -149,24 +152,27 @@ class FetchDocsJob:
             doc = link_loader.render(doc)
 
             # run any category-specific document modifications
-            doc = self._edit_docs(doc)
+            doc = self._edit_docs(doc, file)
 
             # render the document to markdown
             out = renderer.render(doc)
             
             return (bytes(out, "utf-8"), link_loader.links)
 
-    def _edit_docs(self, doc: mistletoe.Document) -> mistletoe.Document:
+    def _edit_docs(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
+        # first, do category-specific edits
         edit_fn = getattr(self, f"_edit_{self._category}_docs", None)
 
         if not edit_fn:
             logger.debug(f"No edit function found for {self._category}")
             return doc
 
-        return edit_fn(doc)
+        doc = edit_fn(doc)
+
+        # then, do common edits afterwards
+        return self._edit_docs_common(doc, file)
 
     def _edit_user_docs(self, doc: mistletoe.Document) -> mistletoe.Document:
-
         # find the index of the first heading in the document
         heading = -1
         for i, token in enumerate(doc.children):
@@ -178,6 +184,21 @@ class FetchDocsJob:
         supported_response_types = self._meta.get("supportedResponseTypes", [])
         response_areas_content = format_response_areas(supported_response_types)
         doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([response_areas_content]))
+
+        return doc
+
+    def _edit_docs_common(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
+        # find the index of the first heading in the document
+        heading = -1
+        for i, token in enumerate(doc.children):
+            if isinstance(token, mistletoe.block_token.Heading) and token.level == 1:
+                heading = i
+                break
+
+        edit_link = self._edit_uri(file)
+        doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([
+            f"[Edit on GitHub :fontawesome-solid-pencil:]({edit_link}){{ .md-button }}"
+        ]))
 
         return doc
 
