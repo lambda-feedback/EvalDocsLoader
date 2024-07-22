@@ -106,7 +106,7 @@ class FetchDocsJob:
             DocsFile(
                 dir=self._out_dir,
                 file_path=out_file_path,
-                edit_uri=self._edit_uri(file),
+                edit_uri=self._edit_url(file),
             )
         )
 
@@ -160,14 +160,11 @@ class FetchDocsJob:
             return (bytes(out, "utf-8"), link_loader.links)
 
     def _edit_docs(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
-        # first, do category-specific edits
-        edit_fn = getattr(self, f"_edit_{self._category}_docs", None)
-
-        if not edit_fn:
+        # first, try category-specific edits
+        if edit_fn := getattr(self, f"_edit_{self._category}_docs", None):
+            doc = edit_fn(doc)
+        else:
             logger.debug(f"No edit function found for {self._category}")
-            return doc
-
-        doc = edit_fn(doc)
 
         # then, do common edits afterwards
         return self._edit_docs_common(doc, file)
@@ -195,10 +192,14 @@ class FetchDocsJob:
                 heading = i
                 break
 
-        edit_link = self._edit_uri(file)
-        doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([
-            f"[Edit on GitHub :fontawesome-solid-pencil:]({edit_link}){{ .md-button }}"
-        ]))
+        edit_link = self._edit_url(file)
+        edit_content = "\n".join([
+            f"[View on GitHub :fontawesome-brands-github:]({edit_link}){{ .md-button }}",
+            "",
+            "---",
+            "",
+        ])
+        doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([edit_content]))
 
         return doc
 
