@@ -62,7 +62,7 @@ class FetchDocsJob:
             main=results[0],
             supplementary=results[1:] if len(results) > 1 else [],
         )
-
+      
     def _edit_uri(self, file: ContentFile):
         return f"{self._repo.html_url}/edit/{self._repo.default_branch}/{file.path}"
 
