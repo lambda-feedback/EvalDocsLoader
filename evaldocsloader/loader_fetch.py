@@ -193,8 +193,10 @@ class FetchDocsJob:
                 break
 
         edit_link = self._edit_url(file)
+        repo_link = self._repo.html_url
         edit_content = "\n".join([
-            f"[View on GitHub :fontawesome-brands-github:]({edit_link}){{ .md-button }}",
+            f"[Edit on GitHub :fontawesome-solid-pen-to-square:]({edit_link}){{ .md-button }}",
+            f"[View Code :fontawesome-solid-code:]({repo_link}){{ .md-button }}",
             "",
             "---",
             "",
