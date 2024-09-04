@@ -17,6 +17,7 @@ from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.base_renderer import BaseRenderer
 
 from .loader_base import DocsFile, DocsBundle, FunctionConfig
+from .auto_tests import TestFile
 
 logger = logging.getLogger("mkdocs.plugin.evaldocsloader.fetcher")
 
@@ -32,6 +33,7 @@ class FetchDocsJob:
     _link_out_dir: str
     _remote_docs_dir: Optional[str]
     _visited_files: Set[str]
+    _test_file: Optional[TestFile]
 
     def __init__(
         self,
@@ -50,12 +52,14 @@ class FetchDocsJob:
         self._link_out_dir = os.path.join(self._out_dir, self._base_dir)
         self._remote_docs_dir = self._config.docs_dir
         self._visited_files = set()
+        self._test_file = None
 
     def fetch(self) -> DocsBundle:
         results: List[DocsFile] = []
 
         os.mkdir(os.path.join(self._link_out_dir, self._config.name))
 
+        self._fetch_test_file()
         self._fetch_and_process_file(f"{self._category}.md", f"{self._config.name}.md", results)
 
         return DocsBundle(
@@ -182,6 +186,9 @@ class FetchDocsJob:
         response_areas_content = format_response_areas(supported_response_types)
         doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([response_areas_content]))
 
+        # Insert a section at the end with examples auto-generated from tests, if a tests file exists
+        
+
         return doc
 
     def _edit_docs_common(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
@@ -204,6 +211,24 @@ class FetchDocsJob:
         doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([edit_content]))
 
         return doc
+
+    def _fetch_test_file(self):
+        """
+        Attempts to fetch a file in the repository root called "eval_tests.*", which
+        contains a list of tests. If this file is found, it is parsed into a TestFile
+        structure and stored in self._test_file.
+        """
+        root_files = self._repo.get_contents("")
+        for root_file in root_files:
+            if root_file.name.startswith("eval_tests."):
+                test_file_str = str(root_file.decoded_content, "utf-8")
+                try:
+                    self._test_file = TestFile(test_file_str, root_file.name)
+                except Exception as e:
+                    logger.warning(f"The test file could not be parsed: {e}")
+                # If a TestFile was successfully parsed, it is stored in self._test_file.
+                # Otherwise, it is left as None
+                return
 
     def _fetch_file(self, file_path: str, docs_dir: Optional[str] = None) -> ContentFile:
         """
