@@ -195,8 +195,8 @@ class FetchDocsJob:
             for group in self._test_file.groups:
                 doc.children.append(mistletoe.block_token.Heading((3, group.get("title"), None)))
                 for test in group.get("tests", []):
-                    response = test.response
-                    answer = test.answer
+                    response = sanitise_response(test.response)
+                    answer = sanitise_response(test.answer)
                     correct = "✓" if test.is_correct else "✗"
 
                     doc.children.append(mistletoe.block_token.Paragraph([test.desc]))
@@ -354,3 +354,8 @@ def format_response_areas(areas: List[str]) -> str:
             out.append(f"      - `{t}`")
 
     return "\n".join(out)
+
+def sanitise_response(input: str) -> str:
+    # When tests are placed in tables, '|' characters delimit table cells.
+    # Any '|'s in the input must be escaped.
+    return input.replace("|", "\\|")
