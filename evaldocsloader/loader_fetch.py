@@ -8,6 +8,7 @@ from github.ContentFile import ContentFile
 from github.Repository import Repository
 
 import mistletoe
+import mistletoe.ast_renderer
 import mistletoe.markdown_renderer
 import mistletoe.span_token
 import mistletoe.token
@@ -187,7 +188,25 @@ class FetchDocsJob:
         doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([response_areas_content]))
 
         # Insert a section at the end with examples auto-generated from tests, if a tests file exists
-        
+        if self._test_file:
+            logger.info(f"Test file found for {self._repo.name}, generating examples")
+            # Append the content to the end of the file
+            doc.children.append(mistletoe.block_token.Heading((2, "Auto-Generated Examples", None)))
+            for group in self._test_file.groups:
+                doc.children.append(mistletoe.block_token.Heading((3, group.get("title"), None)))
+                for test in group.get("tests", []):
+                    response = test.response
+                    answer = test.answer
+                    correct = "✓" if test.is_correct else "✗"
+
+                    doc.children.append(mistletoe.block_token.Paragraph([test.desc]))
+                    doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+                    doc.children.append(mistletoe.block_token.Table(([
+                        "\n|Response|Answer|Correct?|",
+                        "|-|-|-|",
+                        f"|`{response}`|`{answer}`|{correct}|",
+                    ], 0)))
+                    doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
 
         return doc
 
