@@ -192,26 +192,50 @@ class FetchDocsJob:
             logger.info(f"Test file found for {self._repo.name}, generating examples")
             # Append the content to the end of the file
             doc.children.append(mistletoe.block_token.Heading((2, "Auto-Generated Examples", None)))
+            
+            # The table header is the same for all tests
+            table_header = [
+                "|Response|Answer|Correct?|",
+                "|-|-|-|",
+            ]
+            
             for group in self._test_file.groups:
                 doc.children.append(mistletoe.block_token.Heading((3, group.get("title"), None)))
                 for test in group.get("tests", []):
+                    if test.exclude_from_docs:
+                        continue
+                    
                     doc.children.append(mistletoe.block_token.Paragraph([test.desc]))
                     doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+
+                    # A buffer that allows tables for multiple sub-tests to be combined
+                    table_lines = []
+                    
                     # Sub tests have the same answer and parameters as a test, but a different response value
                     for sub_test in test.sub_tests:
+                        if sub_test.exclude_from_docs:
+                            continue
+                        
                         response = sanitise_response(sub_test.response)
                         answer = sanitise_response(test.answer)
                         correct = "✓" if sub_test.is_correct else "✗"
-                        
+
+                        if sub_test.desc and len(table_lines) != 0:
+                            # Flush pending examples if necessary
+                            doc.children.append(mistletoe.block_token.Table((table_header + table_lines, 0)))
+                            doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+
+                            table_lines.clear()
+
+                        table_lines.append(f"|`{response}`|`{answer}`|{correct}|")
+
                         if sub_test.desc:
                             doc.children.append(mistletoe.block_token.Paragraph([sub_test.desc]))
                             doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
-                        
-                        doc.children.append(mistletoe.block_token.Table(([
-                            "\n|Response|Answer|Correct?|",
-                            "|-|-|-|",
-                            f"|`{response}`|`{answer}`|{correct}|",
-                        ], 0)))
+                    
+                    # Flush any remaining examples
+                    if len(table_lines) != 0:
+                        doc.children.append(mistletoe.block_token.Table((table_header + table_lines, 0)))
                         doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
 
         return doc
