@@ -195,18 +195,24 @@ class FetchDocsJob:
             for group in self._test_file.groups:
                 doc.children.append(mistletoe.block_token.Heading((3, group.get("title"), None)))
                 for test in group.get("tests", []):
-                    response = sanitise_response(test.response)
-                    answer = sanitise_response(test.answer)
-                    correct = "✓" if test.is_correct else "✗"
-
                     doc.children.append(mistletoe.block_token.Paragraph([test.desc]))
                     doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
-                    doc.children.append(mistletoe.block_token.Table(([
-                        "\n|Response|Answer|Correct?|",
-                        "|-|-|-|",
-                        f"|`{response}`|`{answer}`|{correct}|",
-                    ], 0)))
-                    doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+                    # Sub tests have the same answer and parameters as a test, but a different response value
+                    for sub_test in test.sub_tests:
+                        response = sanitise_response(sub_test.response)
+                        answer = sanitise_response(test.answer)
+                        correct = "✓" if sub_test.is_correct else "✗"
+                        
+                        if sub_test.desc:
+                            doc.children.append(mistletoe.block_token.Paragraph([sub_test.desc]))
+                            doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+                        
+                        doc.children.append(mistletoe.block_token.Table(([
+                            "\n|Response|Answer|Correct?|",
+                            "|-|-|-|",
+                            f"|`{response}`|`{answer}`|{correct}|",
+                        ], 0)))
+                        doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
 
         return doc
 
