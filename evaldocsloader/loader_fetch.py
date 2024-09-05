@@ -18,7 +18,7 @@ from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.base_renderer import BaseRenderer
 
 from .loader_base import DocsFile, DocsBundle, FunctionConfig
-from .auto_tests import TestFile
+from autotests import TestFile
 
 logger = logging.getLogger("mkdocs.plugin.evaldocsloader.fetcher")
 
