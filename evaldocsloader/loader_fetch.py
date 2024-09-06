@@ -8,7 +8,6 @@ from github.ContentFile import ContentFile
 from github.Repository import Repository
 
 import mistletoe
-import mistletoe.ast_renderer
 import mistletoe.markdown_renderer
 import mistletoe.span_token
 import mistletoe.token
@@ -191,7 +190,7 @@ class FetchDocsJob:
         if self._test_file:
             logger.info(f"Test file found for {self._repo.name}, generating examples")
             # Append the content to the end of the file
-            doc.children.append(mistletoe.block_token.Heading((2, "Auto-Generated Examples", None)))
+            doc.children.append(mistletoe.block_token.Heading((2, "Examples from Integration Tests", None)))
             
             # The table header is the same for all tests
             table_header = [
@@ -200,8 +199,8 @@ class FetchDocsJob:
             ]
             
             for group in self._test_file.groups:
-                doc.children.append(mistletoe.block_token.Heading((3, group.get("title"), None)))
-                for test in group.get("tests", []):
+                doc.children.append(mistletoe.block_token.Heading((3, group.title, None)))
+                for test in group.tests:
                     if test.exclude_from_docs:
                         continue
                     
