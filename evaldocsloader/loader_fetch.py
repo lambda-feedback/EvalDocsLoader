@@ -160,7 +160,7 @@ class FetchDocsJob:
 
             # render the document to markdown
             out = renderer.render(doc)
-            
+
             return (bytes(out, "utf-8"), link_loader.links)
 
     def _edit_docs(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
@@ -186,58 +186,63 @@ class FetchDocsJob:
         response_areas_content = format_response_areas(supported_response_types)
         doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([response_areas_content]))
 
+        self._edit_user_docs_insert_autotests(doc)
+
+        return doc
+
+    def _edit_user_docs_insert_autotests(self, doc: mistletoe.Document):
+        if not self._test_file:
+            return
+
         # Insert a section at the end with examples auto-generated from tests, if a tests file exists
-        if self._test_file:
-            logger.info(f"Test file found for {self._repo.name}, generating examples")
-            # Append the content to the end of the file
-            doc.children.append(mistletoe.block_token.Heading((2, "Examples from Integration Tests", None)))
-            
-            # The table header is the same for all tests
-            table_header = [
-                "|Response|Answer|Correct?|",
-                "|-|-|-|",
-            ]
-            
-            for group in self._test_file.groups:
-                doc.children.append(mistletoe.block_token.Heading((3, group.title, None)))
-                for test in group.tests:
-                    if test.exclude_from_docs:
+        logger.info(f"Test file found for {self._repo.name}, generating examples")
+        # Append the content to the end of the file
+        doc.children.append(mistletoe.block_token.Heading((2, "Examples from Integration Tests", None)))
+        
+        # The table header is the same for all tests
+        table_header = [
+            "|Response|Answer|Correct?|",
+            "|-|-|-|",
+        ]
+        
+        for group in self._test_file.groups:
+            doc.children.append(mistletoe.block_token.Heading((3, group.title, None)))
+            for test in group.tests:
+                if test.exclude_from_docs:
+                    continue
+                
+                doc.children.append(mistletoe.block_token.Paragraph([test.desc]))
+                doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+
+                # A buffer that allows tables for multiple sub-tests to be combined
+                table_lines = []
+                
+                # Sub tests have the same answer and parameters as a test, but a different response value
+                for sub_test in test.sub_tests:
+                    if sub_test.exclude_from_docs:
                         continue
                     
-                    doc.children.append(mistletoe.block_token.Paragraph([test.desc]))
-                    doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+                    response = sanitise_response(sub_test.response)
+                    answer = sanitise_response(test.answer)
+                    correct = "✓" if sub_test.is_correct else "✗"
 
-                    # A buffer that allows tables for multiple sub-tests to be combined
-                    table_lines = []
-                    
-                    # Sub tests have the same answer and parameters as a test, but a different response value
-                    for sub_test in test.sub_tests:
-                        if sub_test.exclude_from_docs:
-                            continue
-                        
-                        response = sanitise_response(sub_test.response)
-                        answer = sanitise_response(test.answer)
-                        correct = "✓" if sub_test.is_correct else "✗"
-
-                        if sub_test.desc and len(table_lines) != 0:
-                            # Flush pending examples if necessary
-                            doc.children.append(mistletoe.block_token.Table((table_header + table_lines, 0)))
-                            doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
-
-                            table_lines.clear()
-
-                        table_lines.append(f"|`{response}`|`{answer}`|{correct}|")
-
-                        if sub_test.desc:
-                            doc.children.append(mistletoe.block_token.Paragraph([sub_test.desc]))
-                            doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
-                    
-                    # Flush any remaining examples
-                    if len(table_lines) != 0:
+                    if sub_test.desc and len(table_lines) != 0:
+                        # Flush pending examples if necessary
                         doc.children.append(mistletoe.block_token.Table((table_header + table_lines, 0)))
                         doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
 
-        return doc
+                        table_lines.clear()
+
+                    table_lines.append(f"|`{response}`|`{answer}`|{correct}|")
+
+                    if sub_test.desc:
+                        doc.children.append(mistletoe.block_token.Paragraph([sub_test.desc]))
+                        doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+                
+                # Flush any remaining examples
+                if len(table_lines) != 0:
+                    doc.children.append(mistletoe.block_token.Table((table_header + table_lines, 0)))
+                    doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
 
     def _edit_docs_common(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
         # find the index of the first heading in the document
