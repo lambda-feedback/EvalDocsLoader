@@ -17,6 +17,7 @@ from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.base_renderer import BaseRenderer
 
 from .loader_base import DocsFile, DocsBundle, FunctionConfig
+from autotests import TestFile
 
 logger = logging.getLogger("mkdocs.plugin.evaldocsloader.fetcher")
 
@@ -32,6 +33,7 @@ class FetchDocsJob:
     _link_out_dir: str
     _remote_docs_dir: Optional[str]
     _visited_files: Set[str]
+    _test_file: Optional[TestFile]
 
     def __init__(
         self,
@@ -50,12 +52,14 @@ class FetchDocsJob:
         self._link_out_dir = os.path.join(self._out_dir, self._base_dir)
         self._remote_docs_dir = self._config.docs_dir
         self._visited_files = set()
+        self._test_file = None
 
     def fetch(self) -> DocsBundle:
         results: List[DocsFile] = []
 
         os.mkdir(os.path.join(self._link_out_dir, self._config.name))
 
+        self._fetch_test_file()
         self._fetch_and_process_file(f"{self._category}.md", f"{self._config.name}.md", results)
 
         return DocsBundle(
@@ -156,7 +160,7 @@ class FetchDocsJob:
 
             # render the document to markdown
             out = renderer.render(doc)
-            
+
             return (bytes(out, "utf-8"), link_loader.links)
 
     def _edit_docs(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
@@ -182,7 +186,63 @@ class FetchDocsJob:
         response_areas_content = format_response_areas(supported_response_types)
         doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([response_areas_content]))
 
+        self._edit_user_docs_insert_autotests(doc)
+
         return doc
+
+    def _edit_user_docs_insert_autotests(self, doc: mistletoe.Document):
+        if not self._test_file:
+            return
+
+        # Insert a section at the end with examples auto-generated from tests, if a tests file exists
+        logger.info(f"Test file found for {self._repo.name}, generating examples")
+        # Append the content to the end of the file
+        doc.children.append(mistletoe.block_token.Heading((2, "Examples from Integration Tests", None)))
+        
+        # The table header is the same for all tests
+        table_header = [
+            "|Response|Answer|Correct?|",
+            "|-|-|-|",
+        ]
+        
+        for group in self._test_file.groups:
+            doc.children.append(mistletoe.block_token.Heading((3, group.title, None)))
+            for test in group.tests:
+                if test.exclude_from_docs:
+                    continue
+                
+                doc.children.append(mistletoe.block_token.Paragraph([test.desc]))
+                doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+
+                # A buffer that allows tables for multiple sub-tests to be combined
+                table_lines = []
+                
+                # Sub tests have the same answer and parameters as a test, but a different response value
+                for sub_test in test.sub_tests:
+                    if sub_test.exclude_from_docs:
+                        continue
+                    
+                    response = sanitise_response(sub_test.response)
+                    answer = sanitise_response(test.answer)
+                    correct = "✓" if sub_test.is_correct else "✗"
+
+                    if sub_test.desc and len(table_lines) != 0:
+                        # Flush pending examples if necessary
+                        doc.children.append(mistletoe.block_token.Table((table_header + table_lines, 0)))
+                        doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+
+                        table_lines.clear()
+
+                    table_lines.append(f"|`{response}`|`{answer}`|{correct}|")
+
+                    if sub_test.desc:
+                        doc.children.append(mistletoe.block_token.Paragraph([sub_test.desc]))
+                        doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
+                
+                # Flush any remaining examples
+                if len(table_lines) != 0:
+                    doc.children.append(mistletoe.block_token.Table((table_header + table_lines, 0)))
+                    doc.children.append(mistletoe.markdown_renderer.BlankLine({}))
 
     def _edit_docs_common(self, doc: mistletoe.Document, file: ContentFile) -> mistletoe.Document:
         # find the index of the first heading in the document
@@ -204,6 +264,21 @@ class FetchDocsJob:
         doc.children.insert(heading + 1, mistletoe.block_token.Paragraph([edit_content]))
 
         return doc
+
+    def _fetch_test_file(self):
+        """
+        Attempts to fetch a file in the repository root called "eval_tests.yaml", which
+        contains a list of tests. If this file is found, it is parsed into a TestFile
+        structure and stored in self._test_file.
+        """
+        try:
+            test_file = self._repo.get_contents("eval_tests.yaml")
+            test_file_str = str(test_file.decoded_content, "utf-8")
+            # If a TestFile was successfully parsed, it is stored in self._test_file.
+            # Otherwise, it is left as None
+            self._test_file = TestFile(test_file_str, test_file.name)
+        except Exception as e:
+            logger.debug(f"{self._repo.name} doesn't contain a valid test file: {e}")
 
     def _fetch_file(self, file_path: str, docs_dir: Optional[str] = None) -> ContentFile:
         """
@@ -310,3 +385,8 @@ def format_response_areas(areas: List[str]) -> str:
             out.append(f"      - `{t}`")
 
     return "\n".join(out)
+
+def sanitise_response(input: str) -> str:
+    # When tests are placed in tables, '|' characters delimit table cells.
+    # Any '|'s in the input must be escaped.
+    return input.replace("|", "\\|")
