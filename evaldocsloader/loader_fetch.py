@@ -262,21 +262,18 @@ class FetchDocsJob:
 
     def _fetch_test_file(self):
         """
-        Attempts to fetch a file in the repository root called "eval_tests.*", which
+        Attempts to fetch a file in the repository root called "eval_tests.yaml", which
         contains a list of tests. If this file is found, it is parsed into a TestFile
         structure and stored in self._test_file.
         """
-        root_files = self._repo.get_contents("")
-        for root_file in root_files:
-            if root_file.name.startswith("eval_tests."):
-                test_file_str = str(root_file.decoded_content, "utf-8")
-                try:
-                    self._test_file = TestFile(test_file_str, root_file.name)
-                except Exception as e:
-                    logger.warning(f"The test file could not be parsed: {e}")
-                # If a TestFile was successfully parsed, it is stored in self._test_file.
-                # Otherwise, it is left as None
-                return
+        try:
+            test_file = self._repo.get_contents("eval_tests.yaml")
+            test_file_str = str(test_file.decoded_content, "utf-8")
+            # If a TestFile was successfully parsed, it is stored in self._test_file.
+            # Otherwise, it is left as None
+            self._test_file = TestFile(test_file_str, test_file.name)
+        except Exception as e:
+            logger.debug(f"{self._repo.name} doesn't contain a valid test file: {e}")
 
     def _fetch_file(self, file_path: str, docs_dir: Optional[str] = None) -> ContentFile:
         """
