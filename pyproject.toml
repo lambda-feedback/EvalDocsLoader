@@ -16,7 +16,7 @@ PyGithub = "^2.3.0"
 ujson = "^5.10.0"
 aiohttp = "^3.9.5"
 mistletoe = "^1.4.0"
-autotests = { git = "https://github.com/m-hurlow/autotests.git", branch = "main" }
+autotests = { git = "https://github.com/lambda-feedback/evaluation-function-auto-tests", branch = "main" }
 
 [tool.poetry.dev-dependencies]
 mkdocs = "^1.6.0"

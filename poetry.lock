@@ -181,9 +181,9 @@ pyyaml = "^6.0"
 
 [package.source]
 type = "git"
-url = "https://github.com/m-hurlow/autotests.git"
+url = "https://github.com/lambda-feedback/evaluation-function-auto-tests"
 reference = "main"
-resolved_reference = "8b59fb77d1efc85eee1c95f1c52462bd592b6754"
+resolved_reference = "1dfcf6c11dc442160fcd4a6ab3084d3c036a04ee"
 
 [[package]]
 name = "certifi"
@@ -1470,4 +1470,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "39d4efa87dd74cf61217f1c2c8bdbbb446e1fb10a0737e202ff729faef7ed896"
+content-hash = "6f5b5faf0166e669a30a527368780ba95449f09a0438960c998f416d777dd5e0"

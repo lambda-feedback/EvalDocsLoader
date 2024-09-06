@@ -2,7 +2,7 @@
 
 Mkdocs plugin for fetching additional .md files registered in a db before render. Specifically from a web request which returns all the available evaluation functions endpoints.
 
-This plugin was specifially developped for the [LambdaFeedback](https://lambdafeedback.com) platform.
+This plugin was specifially developed for the [LambdaFeedback](https://lambdafeedback.com) platform.
 
 _NOTE: There is currently no safety checking to make sure downloaded markdown files are valid and able to be rendered, they are simply copied over directly from the evaluation function endpoint_
 
