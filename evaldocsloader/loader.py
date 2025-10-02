@@ -68,7 +68,8 @@ class FunctionLoader(DocsLoader):
             # fetch the documentation for each function
             with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as pool:
                 for doc in pool.map(lambda r: self._fetch_function_docs(r, meta), repos):
-                    docs.append(doc)
+                    if doc:
+                        docs.append(doc)
 
             return docs
         except Exception as e:
@@ -115,13 +116,14 @@ class FunctionLoader(DocsLoader):
         self,
         repo: Repository,
         meta_map: Dict[str, Dict],
-    ) -> Docs:
+    ) -> Docs | None:
         # get the function config from the repository
         config = self._get_function_config(repo)
 
-        # warn if no metadata is found for the function
+        # skip repo if no metadata is found for the function
         if not meta_map.get(config.name):
-            logger.warning(f"No deployed evaluation function found for '{config.name}'")
+            logger.warning(f"No deployed evaluation function found for '{config.name}' from repo '{repo.name}'. The deployed function name on the platform may not match the repo config name.")
+            return None
 
         meta = meta_map.get(config.name, {})
 
@@ -147,7 +149,7 @@ class FunctionLoader(DocsLoader):
 
             name = config.get("EvaluationFunctionName")
             if not name:
-                raise ValueError(f"Could not get function name")
+                logger.error(f"Could not get function name. Function name may not be set in config.json for repo '{repo.name}'")
 
             return FunctionConfig(
                 name=name,
