@@ -3,6 +3,8 @@ name = "evaldocsloader"
 version = "0.2.0"
 description = "Mkdocs plugin for fetching, building and consolidating evaluation function documentation."
 authors = [
+    "Alexandra Neagu <alexandra.neagu20@imperial.ac.uk>",
+    "Jarka Baker <jaroslava.baker@imperial.ac.uk>",
     "Andreas Pfurtscheller <andreas.pfurtscheller23@imperial.ac.uk>",
     "Pierre Tharreau <pierre.tharreau18@imperial.ac.uk>",
 ]
