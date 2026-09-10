@@ -37,15 +37,61 @@ This plugin hooks into three events:
 
 For all events, if a plugin-breaking error occurs, it will be caught and evaluation function documentation fetching is aborted.
 
-## Dev Notes
+## Installing
 
-Package can be installed locally using
+This package is distributed via **tagged GitHub Releases**, not PyPI. The PyPI
+project (`evaldocsloader`, last released `0.1.5` in 2023) is deprecated and no
+longer updated — do not install from it.
+
+Pin a released tag in the consuming project:
+
+- **Poetry** (`pyproject.toml`):
+
+  ```toml
+  evaldocsloader = { git = "https://github.com/lambda-feedback/EvalDocsLoader.git", tag = "v0.3.0" }
+  ```
+
+- **pip** / `requirements.txt`:
+
+  ```
+  evaldocsloader @ git+https://github.com/lambda-feedback/EvalDocsLoader.git@v0.3.0
+  ```
+
+Tracking `branch = "main"` / `@main` instead of a tag pulls in unreleased code and
+should only be done alongside a committed lock file.
+
+## Local development
+
+Preferred:
+
+```bash
+poetry install
+```
+
+or, with plain pip:
 
 ```bash
 pip install -e .
 ```
 
-I've included a small flask api for testing, it's not relevant to the actual plugin - just for development.
+A small Flask API for testing lives in `testing_api/`. It is not part of the plugin —
+it just provides an endpoint to develop against.
+
+## Cutting a release (maintainers)
+
+1. Bump `version` in `pyproject.toml` on `main` and merge.
+2. Tag the merge commit and push the tag — it must match `pyproject.toml`:
+
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+3. The [`Release` workflow](.github/workflows/release.yml) verifies the tag against
+   `pyproject.toml`, runs `poetry build`, and publishes a GitHub Release with the
+   built `sdist`/`wheel` attached. Confirm it under the repo's **Releases** tab.
+4. Bump the pinned `tag` in consuming repos (e.g. `user-documentation/pyproject.toml`)
+   in a follow-up PR.
 
 ### Sources/References
 
