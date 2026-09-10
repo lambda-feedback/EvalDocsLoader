@@ -79,19 +79,25 @@ it just provides an endpoint to develop against.
 
 ## Cutting a release (maintainers)
 
-1. Bump `version` in `pyproject.toml` on `main` and merge.
-2. Tag the merge commit and push the tag — it must match `pyproject.toml`:
+Releases are cut from the GitHub UI:
 
-   ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   ```
-
-3. The [`Release` workflow](.github/workflows/release.yml) verifies the tag against
-   `pyproject.toml`, runs `poetry build`, and publishes a GitHub Release with the
-   built `sdist`/`wheel` attached. Confirm it under the repo's **Releases** tab.
+1. **Actions → Release → Run workflow**, on `main`.
+2. Pick the version bump: `patch`, `minor`, `major`, or a `pre*` variant.
+3. The [`Release` workflow](.github/workflows/release.yml) runs `poetry version <bump>`,
+   commits the new `version` to `main`, creates the matching `vX.Y.Z` tag, runs
+   `poetry build`, and publishes a GitHub Release with the `sdist`/`wheel` attached
+   (`pre*` versions are marked as pre-releases). Confirm it under the **Releases** tab.
 4. Bump the pinned `tag` in consuming repos (e.g. `user-documentation/pyproject.toml`)
    in a follow-up PR.
+
+The workflow also runs on a manually pushed `v*` tag: it checks the tag matches
+`pyproject.toml`, then builds and releases the same way. Use this only to release
+outside the UI.
+
+> The "Run workflow" button pushes the version-bump commit and tag directly to the
+> branch it runs from, so GitHub Actions must be allowed to write to the default
+> branch: repo **Settings → Actions → General → Workflow permissions → Read and
+> write**, with no branch-protection rule blocking the `github-actions` bot.
 
 ### Sources/References
 

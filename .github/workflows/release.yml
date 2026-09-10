@@ -5,12 +5,30 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver part to bump for this release"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
 
 env:
   POETRY_VERSION: "1.8.2"
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -19,6 +37,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,24 +50,51 @@ jobs:
         with:
           version: ${{ env.POETRY_VERSION }}
 
+      # workflow_dispatch: bump the version in pyproject.toml, then commit and tag it
+      # on the branch the workflow was run from (normally main). The push uses the
+      # default GITHUB_TOKEN, so it does not re-trigger this workflow.
+      - name: Bump version, commit and tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          poetry version "${{ inputs.bump }}"
+          new_version="$(poetry version --short)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release v${new_version}"
+          git tag "v${new_version}"
+          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "v${new_version}"
+
+      # tag push: the pushed tag must match the committed pyproject.toml version.
       - name: Check tag matches project version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push'
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
           project_version="$(poetry version --short)"
-          echo "tag=$tag_version project=$project_version"
           if [ "$tag_version" != "$project_version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match pyproject.toml version $project_version"
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match pyproject.toml version ${project_version}"
             exit 1
+          fi
+
+      - name: Resolve release tag
+        id: rel
+        run: |
+          version="$(poetry version --short)"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          if printf '%s' "${version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build package
         run: poetry build
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.rel.outputs.tag }}
           generate_release_notes: true
           fail_on_unmatched_files: true
+          prerelease: ${{ steps.rel.outputs.prerelease }}
           files: dist/*
